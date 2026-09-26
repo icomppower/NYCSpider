@@ -1,0 +1,6 @@
+node_modules/
+dist/
+recordings/raw/
+*.blend1
+__pycache__/
+recordings/
