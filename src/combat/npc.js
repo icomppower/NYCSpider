@@ -47,6 +47,7 @@ export class NPC {
   setState(s) { this.state = s; this.stateT = 0; }
   dispose() {
     this.game.scene.remove(this.root);
+    if (this.webSplat) this.game.scene.remove(this.webSplat);
     this.removed = true;
   }
   faceTo(dir, dt, rate = 8) {
@@ -86,6 +87,60 @@ export class NPC {
     return true;
   }
 
+  // Yanked by a web line toward `dest` over `dur` seconds (arcing on the ground
+  // version, straight into the air next to the player on the aerial one).
+  pullTo(dest, dur, air) {
+    if (this.state === 'defeated') return false;
+    this.game.npcs.releaseAttackToken(this);
+    this.pull = { from: this.pos.clone(), dest: dest.clone(), dur, air, t: 0 };
+    this.setState('pulled');
+    this.airborne = true;
+    this.anim.play('Pulled', { fade: 0.06 });
+    return true;
+  }
+  s_pulled(dt) {
+    const P = this.pull;
+    P.t += dt;
+    const k = Math.min(1, P.t / P.dur);
+    const e = 1 - (1 - k) * (1 - k);
+    this.pos.lerpVectors(P.from, P.dest, e);
+    if (!P.air) this.pos.y += Math.sin(Math.PI * k) * 1.1;
+    const to = P.dest.clone().sub(P.from); to.y = 0;
+    this.faceTo(to.negate(), dt, 20);
+    if (k >= 1) {
+      if (P.air) {
+        this.vel.set(0, 1.5, 0);
+        this.setState('juggle');
+        this.anim.play('Juggle', { fade: 0.08 });
+      } else {
+        this.airborne = false;
+        this.vel.set(0, 0, 0);
+        this.setState('stagger');
+        this.anim.play('Hit', { loop: false, fade: 0.05, restart: true });
+      }
+      this.game.fx.burst(this.center, '#ffffff', 10, 3, 0.08, 0.25);
+    }
+  }
+  s_stagger(dt) {
+    this.vel.x = this.vel.z = 0;
+    if (this.stateT > 0.5 && this.anim.currentName !== 'Pulled') this.anim.play('Pulled', { fade: 0.2 });
+    if (this.stateT > 1.4) this.setState('approach');
+  }
+  cocoon() {
+    if (this.webbed) return;
+    this.webbed = true;
+    const hips = this.root.getObjectByName('spine') || this.root;
+    const m = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), new THREE.MeshStandardMaterial({ color: '#eef1f6', roughness: 1, transparent: true, opacity: 0.92 }));
+    m.scale.set(0.24, 0.62, 0.2);
+    m.position.set(0, 0.05, 0);
+    hips.add(m);
+    const s = new THREE.Mesh(new THREE.CircleGeometry(0.9, 18), new THREE.MeshBasicMaterial({ color: '#f2f4ff', transparent: true, opacity: 0.55, depthWrite: false }));
+    s.rotation.x = -Math.PI / 2;
+    s.position.set(this.pos.x, this.pos.y + 0.03, this.pos.z);
+    this.game.scene.add(s);
+    this.webSplat = s;
+  }
+
   physics(dt, gravity = 22) {
     if (this.airborne) {
       this.vel.y -= gravity * dt;
@@ -110,6 +165,12 @@ export class NPC {
   }
 
   onLand(impact) {
+    if (this.slammed) {
+      this.slammed = false;
+      this.game.fx.dust(this.pos, 30, 7);
+      this.game.camRig.shake(0.5, 0.3);
+      this.game.combat?.slamShock(this);
+    }
     if (this.state === 'juggle' || this.state === 'knockdown' || this.state === 'pulled' || this.hp <= 0) {
       if (impact > 6) this.game.fx.dust(this.pos, 14, 3);
       this.setState('down');
@@ -121,7 +182,7 @@ export class NPC {
     this.stateT += dt;
     const fn = this['s_' + this.state];
     if (fn) fn.call(this, dt);
-    this.physics(dt, this.state === 'juggle' ? this.game.juggleGravity ?? 22 : 22);
+    if (this.state !== 'pulled') this.physics(dt, this.state === 'juggle' ? this.game.juggleGravity ?? 22 : 22);
     this.root.position.copy(this.pos);
     this.root.quaternion.setFromAxisAngle(UP, this.yaw);
     this.anim.update(dt);

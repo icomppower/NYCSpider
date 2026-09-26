@@ -12,6 +12,7 @@ import { NPCManager } from './combat/npc.js';
 import { Combat } from './combat/combat.js';
 import { SuitManager } from './player/suits.js';
 import { SuitMenu } from './ui/menu.js';
+import { CrimeSystem } from './events/crimes.js';
 
 const params = new URLSearchParams(location.search);
 const quality = params.get('q') || 'high';
@@ -48,7 +49,8 @@ class Game {
     this.hud = new HUD(this);
     this.suits = new SuitManager(this);
     this.menu = new SuitMenu(this);
-    this.systems = [this.combat, this.npcs, this.fx];
+    this.crimes = new CrimeSystem(this);
+    this.systems = [this.combat, this.npcs, this.fx, this.crimes];
     this.hitStopT = 0;
     addEventListener('resize', () => this.resize());
     document.getElementById('loading').remove();

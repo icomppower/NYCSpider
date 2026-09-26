@@ -237,6 +237,13 @@ export class Player {
 
   // ------------------------------------------------------------ air
   update_air(dt) {
+    if (this.airAction) {
+      const c = this.integrate(dt, this.airGravity ?? G);
+      if (c.ground) { this.airGravity = null; this.land(Math.min(this.vel.y, this.lastVy ?? 0)); }
+      this.lastVy = this.vel.y;
+      return;
+    }
+    if (this.airGravity && this.vel.y < -2) this.airGravity = null;
     const { dir, mag } = this.moveInput();
     const hv = new THREE.Vector3(this.vel.x, 0, this.vel.z);
     const cap = Math.max(TUNING.run, hv.length());
@@ -262,6 +269,7 @@ export class Player {
   land(vy) {
     this.setState('ground');
     this.airAction = null;
+    this.airGravity = null;
     this.emit('land', { vy });
     if (!this.legacyAnim) return this.landV2(vy);
     if (vy < -20) {
