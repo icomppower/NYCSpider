@@ -67,6 +67,7 @@ export class Player {
   setState(s) {
     if (this.state === s) return;
     const prev = this.state;
+    this.prevState = prev;
     this.state = s;
     this.stateTime = 0;
     this.emit('state', { prev, next: s });
@@ -253,7 +254,7 @@ export class Player {
     if (hv.lengthSq() > 1) this.faceTowards(hv, dt, 4);
     if (this.anim.currentName === 'JumpStart' && this.vel.y < 0) this.anim.play('Fall', { fade: 0.3 });
 
-    if (this.input.down('ShiftLeft', 'ShiftRight') && this.stateTime > 0.12 && !this.airAction) {
+    if (this.input.down('ShiftLeft', 'ShiftRight') && this.stateTime > (this.prevState === 'swing' ? 0.3 : 0.12) && !this.airAction) {
       if (this.trySwing()) return;
     }
     if (this.input.hit('KeyF')) this.tryZip();
@@ -328,14 +329,21 @@ export class Player {
     const hv = new THREE.Vector3(this.vel.x, 0, this.vel.z);
     const fwd = hv.lengthSq() > 4 ? hv.normalize() : this.game.camRig.forward();
     this.swingSide = -this.swingSide;
-    const a = findSwingAnchor(this.collision, this.pos, fwd, this.swingSide);
+    const a = findSwingAnchor(this.collision, this.pos, fwd, this.swingSide, 36);
     if (!a) return false;
-    this.anchor = a.point;
+    // The web sticks to the real wall point, but the pendulum pivots on a point
+    // pulled toward the travel line so the arc stays over the street instead
+    // of yanking the player sideways into the facade.
+    this.anchorVis = a.point.clone();
+    const rel = a.point.clone().sub(this.pos);
+    const lat = rel.clone().sub(fwd.clone().multiplyScalar(rel.dot(fwd))); lat.y = 0;
+    this.anchor = a.point.clone().addScaledVector(lat, -0.92);
     const d = this.pos.distanceTo(this.anchor);
     // shorter rope than current distance gives an initial tug
     this.ropeLen = Math.max(8, d * 0.92);
-    // never let the arc hit the street
-    this.ropeLen = Math.min(this.ropeLen, this.anchor.y - 2.5);
+    // never let the arc hit the street, and keep arcs a readable size
+    this.ropeLen = Math.min(this.ropeLen, this.anchor.y - 2.5, 30);
+    this.swingFwd = fwd.clone();
     this.web.shoot();
     this.setState('swing');
     this.anim.play('Swing', this.legacyAnim ? { fade: 0.18 } : {});
@@ -361,27 +369,39 @@ export class Player {
       const vr = this.vel.dot(toP);
       if (vr > 0) this.vel.addScaledVector(toP, -vr);
     }
+    // steer away from facades we are about to clip
+    for (const side of [-1, 1]) {
+      const hvn = this.swingFwd;
+      const probe = new THREE.Vector3(-hvn.z * side, 0, hvn.x * side);
+      const hit = this.collision.raycast(this.pos, probe, 3.5, (b) => b.tag === 'building');
+      if (hit) this.vel.addScaledVector(probe, -(3.5 - hit.t) * 9 * dt);
+    }
     const c = this.collision.resolveCylinder(this.pos, RADIUS, -HIP, HEAD, this.vel);
     const hv2 = new THREE.Vector3(this.vel.x, 0, this.vel.z);
     if (hv2.lengthSq() > 1) this.faceTowards(hv2, dt, 6);
-    this.web.show(this.handWorld('R'), this.anchor, dt);
+    this.web.show(this.handWorld('R'), this.anchorVis || this.anchor, dt);
 
     // phase of the swing drives the pose (0 behind anchor .. 1 in front)
     const rel = this.pos.clone().sub(this.anchor).normalize();
-    const f = hv2.lengthSq() > 0.01 ? hv2.normalize() : new THREE.Vector3(0, 0, 1);
+    const f = this.swingFwd;
     this.swingPhase = THREE.MathUtils.clamp(0.5 + Math.asin(THREE.MathUtils.clamp(rel.dot(f), -1, 1)) / Math.PI, 0, 1);
     this.anim.setTime('Swing', this.swingPhase * this.anim.duration('Swing') * 0.999);
     this.anim.actions.Swing.timeScale = 0;
 
-    const release = !this.input.down('ShiftLeft', 'ShiftRight');
+    // holding Shift chains swings: let go near the top of the forward arc and
+    // the air state immediately fires the next web
+    const chain = this.stateTime > 0.7 && this.swingPhase > 0.8 && this.vel.y > 0 && this.vel.y < 6;
+    const release = !this.input.down('ShiftLeft', 'ShiftRight') || chain;
     const jump = this.input.hit('Space');
     if (c.ground) { this.endSwing(); this.land(this.vel.y); return; }
-    if (c.wall && this.stateTime > 0.25) { this.endSwing(); return this.attachWall(c.wall, c.wallBox); }
+    // only stick to a wall mid-swing when steering into it
+    if (c.wall && this.stateTime > 0.25 && this.moveInput().dir.dot(c.wall) < -0.5) { this.endSwing(); return this.attachWall(c.wall, c.wallBox); }
     if (release || jump || this.stateTime > 6) {
       this.endSwing();
-      const boost = jump ? 7 : 3.5;
-      const fw = new THREE.Vector3(this.vel.x, 0, this.vel.z).normalize();
-      this.vel.addScaledVector(fw, 2.5);
+      const boost = jump ? 7 : chain ? 0.5 : 3.5;
+      const fw = this.swingFwd.clone();
+      this.heading = fw.clone();
+      this.vel.addScaledVector(fw, chain ? 1.5 : 2.5);
       this.vel.y = Math.max(this.vel.y, 0) + boost;
       this.setState('air');
       if (this.swingPhase > 0.55) this.anim.play('SwingFlip', { loop: false, fade: 0.12 });

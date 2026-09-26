@@ -39,7 +39,7 @@ export function findSwingAnchor(collision, pos, forward, side, maxDist = 55) {
   const right = new THREE.Vector3().crossVectors(forward, UP).normalize();
   let best = null;
   for (const s of [side, -side]) {
-    for (const elev of [50, 60, 42, 70]) {
+    for (const elev of [42, 50, 60, 70]) {
       const e = THREE.MathUtils.degToRad(elev);
       for (const lat of [0.55, 0.3, 0.85]) {
         const dir = new THREE.Vector3()
@@ -48,8 +48,9 @@ export function findSwingAnchor(collision, pos, forward, side, maxDist = 55) {
           .addScaledVector(UP, Math.sin(e))
           .normalize();
         const hit = collision.raycast(pos, dir, maxDist, (b) => b.tag === 'building');
-        if (!hit || hit.point.y < pos.y + 5 || hit.t < 9) continue;
-        const score = hit.point.clone().sub(pos).dot(forward) + 0.3 * (hit.point.y - pos.y);
+        if (!hit || hit.point.y < pos.y + 5 || hit.point.y > pos.y + 30 || hit.t < 9) continue;
+        // prefer anchors well ahead and not much higher than needed (keeps altitude steady)
+        const score = hit.point.clone().sub(pos).dot(forward) - 0.25 * Math.abs(hit.point.y - pos.y - 18);
         if (!best || score > best.score) best = { point: hit.point, score, virtual: false };
       }
     }

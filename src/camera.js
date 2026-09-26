@@ -37,8 +37,12 @@ export class CameraRig {
     const v = player.vel;
     const hs = Math.hypot(v.x, v.z);
     // drift behind the direction of travel when the mouse is idle
-    if (this.idleLook > 0.8 && hs > 2) {
-      const want = Math.atan2(-v.x, -v.z);
+    // heading: the swing's launch direction while swinging (velocity is mostly
+    // vertical near the apex), otherwise the horizontal velocity
+    const head = player.state === 'swing' && player.swingFwd ? player.swingFwd : v;
+    const minSpeed = player.state === 'ground' ? 2 : 6;
+    if (this.idleLook > 0.8 && hs > minSpeed && player.state !== 'wall') {
+      const want = Math.atan2(-head.x, -head.z);
       let d = want - this.yaw;
       d = Math.atan2(Math.sin(d), Math.cos(d));
       this.yaw += d * Math.min(1, dt * (player.state === 'swing' ? 1.6 : 0.9));

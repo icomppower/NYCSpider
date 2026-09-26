@@ -20,6 +20,14 @@ export function setupSky(scene, renderer, quality) {
   scene.add(sky);
   scene.fog = new THREE.Fog('#c9b8a8', 120, quality === 'low' ? 420 : 620);
 
+  // environment map from the sky dome so glass towers reflect the sunset
+  const envScene = new THREE.Scene();
+  envScene.add(new THREE.Mesh(skyGeo, skyMat.clone()));
+  const pm = new THREE.PMREMGenerator(renderer);
+  scene.environment = pm.fromScene(envScene, 0.02).texture;
+  scene.environmentIntensity = 0.6;
+  pm.dispose();
+
   const hemi = new THREE.HemisphereLight('#bcd4ff', '#5a4a3c', 1.1);
   scene.add(hemi);
   const sun = new THREE.DirectionalLight('#ffe2bf', 2.6);

@@ -13,6 +13,8 @@ import { Combat } from './combat/combat.js';
 import { SuitManager } from './player/suits.js';
 import { SuitMenu } from './ui/menu.js';
 import { CrimeSystem } from './events/crimes.js';
+import { Traffic } from './world/traffic.js';
+import { Pedestrians } from './world/pedestrians.js';
 
 const params = new URLSearchParams(location.search);
 const quality = params.get('q') || 'high';
@@ -40,6 +42,7 @@ class Game {
     this.timeScale = 1;
     this.sky = setupSky(this.scene, renderer, quality);
     this.city = new City(this.scene, this.collision, this.assets, { seed: 11 });
+    this.layout = await import('./world/layout.js');
     this.camRig = new CameraRig(this.camera, this.collision, this.input);
     this.player = new Player(this);
     this.player.pos.set(params.has('x') ? +params.get('x') : 0, 1.2, params.has('z') ? +params.get('z') : 0);
@@ -50,7 +53,9 @@ class Game {
     this.suits = new SuitManager(this);
     this.menu = new SuitMenu(this);
     this.crimes = new CrimeSystem(this);
-    this.systems = [this.combat, this.npcs, this.fx, this.crimes];
+    this.traffic = new Traffic(this, quality === 'low' ? 36 : 56);
+    this.peds = new Pedestrians(this, quality === 'low' ? 10 : 18);
+    this.systems = [this.combat, this.npcs, this.fx, this.crimes, this.traffic, this.peds];
     this.hitStopT = 0;
     addEventListener('resize', () => this.resize());
     document.getElementById('loading').remove();
