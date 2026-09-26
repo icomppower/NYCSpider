@@ -28,3 +28,5 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d12; fon
 .suit-card p { margin: 0; font-size: 13px; opacity: .75; line-height: 1.5; }
 .hint { opacity: .5; font-size: 13px; margin-top: 26px; }
 #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 22px; letter-spacing: .3em; background: #0b0d12; }
+.suit-card .swatch { height: 260px; display: flex; align-items: flex-end; justify-content: center; position: relative; overflow: hidden; }
+.suit-card .swatch img { height: 100%; filter: drop-shadow(0 6px 12px rgba(0,0,0,.6)); }

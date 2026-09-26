@@ -10,6 +10,8 @@ import { HUD } from './ui/hud.js';
 import { FX } from './fx/particles.js';
 import { NPCManager } from './combat/npc.js';
 import { Combat } from './combat/combat.js';
+import { SuitManager } from './player/suits.js';
+import { SuitMenu } from './ui/menu.js';
 
 const params = new URLSearchParams(location.search);
 const quality = params.get('q') || 'high';
@@ -44,6 +46,8 @@ class Game {
     this.npcs = new NPCManager(this);
     this.combat = new Combat(this);
     this.hud = new HUD(this);
+    this.suits = new SuitManager(this);
+    this.menu = new SuitMenu(this);
     this.systems = [this.combat, this.npcs, this.fx];
     this.hitStopT = 0;
     addEventListener('resize', () => this.resize());
@@ -66,12 +70,15 @@ class Game {
   // deterministic stepping for scripted capture: game.step(1/30) from Playwright
   hitStop(t) { this.hitStopT = Math.max(this.hitStopT, t); }
   step(raw) {
+    this.menu.update();
+    if (this.paused) { this.input.endFrame(); return; }
     let dt = raw * this.timeScale;
     if (this.hitStopT > 0) { this.hitStopT -= raw; dt *= 0.05; }
     this.time += dt;
     this.realTime = (this.realTime || 0) + raw;
     this.player.update(dt);
     for (const s of this.systems) s.update(dt, raw);
+    this.suits.update(dt, raw);
     this.player.invuln = this.player.invuln || 0;
     this.city.update(dt, this);
     this.camRig.update(raw, this.player);

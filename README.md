@@ -20,3 +20,4 @@ npm run record -- <scenario>   # 以固定 30fps 錄製 tools/scenarios/<scenari
 | Shift | 地面跑酷衝刺、空中發射蛛絲擺盪 |
 | 滑鼠左鍵 / J | 攻擊連段 |
 | F | 蛛絲衝刺至準心所指的牆面 |
+| Tab | 戰衣選單（經典 / 共生體），選擇後播放換裝過場 |
