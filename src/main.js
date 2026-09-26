@@ -3,6 +3,7 @@ import { loadAssets } from './core/assets.js';
 import { Input } from './core/input.js';
 import { CollisionWorld } from './world/collision.js';
 import { City } from './world/city.js';
+import * as Layout from './world/layout.js';
 import { setupSky } from './world/sky.js';
 import { Player } from './player/player.js';
 import { CameraRig } from './camera.js';
@@ -42,7 +43,7 @@ class Game {
     this.timeScale = 1;
     this.sky = setupSky(this.scene, renderer, quality);
     this.city = new City(this.scene, this.collision, this.assets, { seed: 11 });
-    this.layout = await import('./world/layout.js');
+    this.layout = Layout;
     this.camRig = new CameraRig(this.camera, this.collision, this.input);
     this.player = new Player(this);
     this.player.pos.set(params.has('x') ? +params.get('x') : 0, 1.2, params.has('z') ? +params.get('z') : 0);
