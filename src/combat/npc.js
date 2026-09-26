@@ -37,7 +37,7 @@ export class NPC {
     const s = kind === 'thug' ? 1.04 + rng() * 0.08 : 0.94 + rng() * 0.1;
     this.root.scale.setScalar(s);
     game.scene.add(this.root);
-    this.anim = new Animator(this.root, game.assets.npc.animations);
+    this.anim = new Animator(this.root, game.assets.npc.animations, { legacy: game.params.get('anim') === 'legacy' });
     this.anim.play(kind === 'thug' ? 'Idle' : 'Walk');
     this.hand = this.root.getObjectByName('handR');
     this.chestBone = this.root.getObjectByName('chest');
@@ -140,7 +140,7 @@ export class NPC {
     const to = pl.pos.clone().sub(this.pos); to.y = 0;
     const d = to.length();
     const ring = this.ring ?? 2.6;
-    this.faceTo(to, dt);
+    if (d < 4) this.faceTo(to, dt);
     const spd = d > 8 ? 4.2 : d > ring ? 1.3 : 0;
     const dir = to.normalize();
     // separation from other thugs
@@ -150,8 +150,13 @@ export class NPC {
       const l = s.length();
       if (l < 1.6 && l > 0.01) dir.addScaledVector(s.normalize(), (1.6 - l) * 1.5);
     }
-    this.vel.x = dir.x * spd; this.vel.z = dir.z * spd;
-    this.moveAnim(spd);
+    // move along the facing direction (turn first) to avoid sideways skating
+    const f = new THREE.Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw));
+    const moveDir = dir.normalize();
+    const along = Math.max(0, f.dot(moveDir));
+    this.faceTo(moveDir, dt, 5);
+    this.vel.x = f.x * spd * along; this.vel.z = f.z * spd * along;
+    this.moveAnim(spd * along);
     this.attackCd -= dt;
     if (d < 2.4 && this.attackCd <= 0 && this.game.npcs.requestAttackToken(this) && pl.pos.y - this.pos.y < 2.2) {
       this.setState('attack');
@@ -162,7 +167,11 @@ export class NPC {
   }
   moveAnim(spd) {
     if (spd < 0.2) this.anim.play(this.kind === 'thug' ? 'Idle' : 'Stand', { fade: 0.25 });
-    else this.anim.play(spd > 2.5 ? 'Run' : 'Walk', { fade: 0.25 });
+    else {
+      const name = spd > 2.5 ? 'Run' : 'Walk';
+      this.anim.play(name, { fade: 0.25 });
+      this.anim.matchSpeed?.(name, spd / this.root.scale.x);
+    }
   }
   s_attack(dt) {
     this.vel.x = this.vel.z = 0;
@@ -227,6 +236,7 @@ export class NPC {
     const f = new THREE.Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw));
     this.vel.x = f.x * 4.5; this.vel.z = f.z * 4.5;
     this.anim.play('Run', { fade: 0.2 });
+    this.anim.matchSpeed?.('Run', 4.5 / this.root.scale.x);
     if (this.stateT > 6) this.dispose();
   }
   s_cheer(dt) {

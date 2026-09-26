@@ -94,10 +94,13 @@ def smooth(t):
 
 
 # ------------------------------------------------------------------ base poses
+STANCE = 0.07  # idle foot stagger shared by every clip that settles into idle
+
+
 def stand(drop=0.02, arms_down=78, lean=0):
     p = {"hips@loc": (0, 0, -drop), "spine": (lean, 0, 0)}
-    leg_ik(p, "L", 0.0, hip_drop=drop, splay=-3)
-    leg_ik(p, "R", 0.0, hip_drop=drop, splay=-3)
+    leg_ik(p, "L", STANCE, hip_drop=drop, splay=-3)
+    leg_ik(p, "R", -STANCE, hip_drop=drop, splay=-3)
     arm(p, "L", y=arms_down, fz=-12)
     arm(p, "R", y=arms_down, fz=-12)
     return p
@@ -106,8 +109,8 @@ def stand(drop=0.02, arms_down=78, lean=0):
 def guard(drop=0.12, twist=0):
     p = {"hips@loc": (0, 0, -drop), "spine": (8, 0, twist), "chest": (4, 0, 0),
          "head": (-6, 0, -twist)}
-    leg_ik(p, "L", -0.12, hip_drop=drop, splay=-10)
-    leg_ik(p, "R", 0.14, hip_drop=drop, splay=-10)
+    leg_ik(p, "L", STANCE + 0.05, hip_drop=drop, splay=-10)
+    leg_ik(p, "R", -STANCE - 0.07, hip_drop=drop, splay=-10)
     arm(p, "L", y=68, x=-25, fz=-125)
     arm(p, "R", y=72, x=-15, fz=-135)
     return p
@@ -211,7 +214,7 @@ def fall():
     return [(0, fall_pose(0)), (12, fall_pose(1)), (24, fall_pose(0))]
 
 
-def crouch_land(drop, spread=0.1, lean=25):
+def crouch_land(drop, spread=STANCE, lean=25):
     p = {"hips@loc": (0, 0, -drop), "spine": (lean, 0, 0), "head": (-lean * 0.8, 0, 0)}
     leg_ik(p, "L", spread, hip_drop=drop, splay=-12)
     leg_ik(p, "R", -spread, hip_drop=drop, splay=-12)
@@ -226,15 +229,18 @@ def land():
 
 def land_hard():
     """Three-point 'superhero' landing (hand + one knee near the ground)."""
-    p = {"hips@loc": (0, 0.0, -0.52), "spine": (45, 0, -8), "chest": (10, 0, 0),
+    p = {"hips@loc": (0, 0.0, -0.5), "spine": (45, 0, -8), "chest": (10, 0, 0),
          "head": (-45, 0, 0)}
-    leg_ik(p, "L", 0.30, hip_drop=0.52, splay=-12)
-    leg_ik(p, "R", -0.35, height=0.05, hip_drop=0.52, splay=-4, toe=40)
+    leg_ik(p, "L", STANCE + 0.12, hip_drop=0.5, splay=-12)
+    leg_ik(p, "R", -STANCE - 0.12, height=0.05, hip_drop=0.5, splay=-4, toe=40)
     arm(p, "R", y=80, x=-35, fz=-5)       # hand planted in front
     arm(p, "L", y=20, z=35, fz=-25)       # other arm flung back
     q = dict(p)
     q["head"] = (-30, 0, 0)
-    return [(0, p), (16, q), (26, crouch_land(0.25, lean=15)), (36, stand())]
+    mid = crouch_land(0.25, lean=15)
+    leg_ik(mid, "L", STANCE + 0.06, hip_drop=0.25, splay=-10)
+    leg_ik(mid, "R", -STANCE - 0.06, hip_drop=0.25, splay=-10)
+    return [(0, p), (16, q), (26, mid), (36, stand())]
 
 
 def roll():
@@ -355,7 +361,7 @@ def kick3():
     g = guard()
     wind = guard(0.1, twist=-25)
     kick = {"hips@loc": (0, 0, -0.05), "spine": (-20, -25, -20), "head": (10, 10, 10)}
-    leg_ik(kick, "L", 0.0, hip_drop=0.05, splay=-5)
+    leg_ik(kick, "L", STANCE + 0.05, hip_drop=0.05, splay=-10)
     leg_raw(kick, "R", x=-95, y=-35, sx=5, fx=30)
     arm(kick, "L", y=50, x=-40, fz=-120)
     arm(kick, "R", y=40, z=40, fz=-40)
@@ -367,7 +373,7 @@ def uppercut():
     low = guard(0.3, twist=-20)
     arm(low, "R", y=85, x=20, fz=-100)
     up = {"hips@loc": (0, 0, 0.02), "spine": (-18, 0, 25), "head": (-15, 0, 0)}
-    leg_ik(up, "L", -0.15, hip_drop=-0.02)
+    leg_ik(up, "L", STANCE + 0.05, hip_drop=-0.02, splay=-10)
     leg_raw(up, "R", x=-40, sx=70, fx=30)
     arm(up, "R", y=-70, z=-60, fz=-40)
     arm(up, "L", y=60, x=-20, fz=-120)

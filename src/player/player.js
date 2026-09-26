@@ -43,7 +43,10 @@ export class Player {
     this.suitMeshes.symbiote.visible = false;
     this.bones = {};
     for (const n of ['hips', 'chest', 'head', 'handR', 'handL', 'footL', 'footR', 'forearmR']) this.bones[n] = this.model.getObjectByName(n);
-    this.anim = new Animator(this.model, gltf.animations);
+    this.legacyAnim = game.params.get('anim') === 'legacy';
+    this.anim = new Animator(this.model, gltf.animations, { legacy: this.legacyAnim });
+    this.groundSpeed = 0;
+    this.metrics = { slide: 0, planted: 0, prevFeet: null, transitions: 0 };
     this.anim.play('Fall');
 
     this.web = new WebLine(scene);
@@ -87,6 +90,32 @@ export class Player {
     if (fn) fn.call(this, dt);
     this.updateModel(dt);
     this.anim.update(dt);
+    this.measureFeet(dt);
+  }
+
+  // Foot-slide metric: horizontal travel of a planted foot (m/s while planted).
+  measureFeet(dt) {
+    const m = this.metrics;
+    if (this.state !== 'ground' || dt <= 0 || this.scripted || this.rolling) { m.prevFeet = null; m.hist = []; return; }
+    this.root.updateMatrixWorld(true);
+    const ground = this.pos.y - HIP;
+    const feet = [this.bones.footL, this.bones.footR].map((b) => b.getWorldPosition(new THREE.Vector3()));
+    // only the support foot counts, and only while it is at contact height:
+    // within 3 cm of the lowest height it reached in the last second
+    const k = feet[0].y < feet[1].y ? 0 : 1;
+    const h = feet[k].y - ground;
+    m.hist = (m.hist || []).concat([h]).slice(-30);
+    const contact = Math.min(...m.hist) + 0.03;
+    if (m.prevFeet && m.prevK === k) {
+      const a = m.prevFeet[k], b = feet[k];
+      const d = Math.hypot(b.x - a.x, b.z - a.z);
+      if (d < 0.5 && a.y - ground < contact && h < contact && h < 0.13) { // (>0.5 m/frame = teleport)
+        m.slide += d;
+        m.planted += dt;
+      }
+    }
+    m.prevK = k;
+    m.prevFeet = feet;
   }
 
   // ------------------------------------------------------------ physics helpers
@@ -117,12 +146,13 @@ export class Player {
 
   // ------------------------------------------------------------ ground
   update_ground(dt) {
-    if (this.combat?.move || this.scripted) {
+    if (this.combat?.move || this.combat?.approach || this.scripted) {
       // combat / cutscene owns horizontal motion this frame
       const c = this.integrate(dt);
       if (!c.ground) { this.setState('air'); this.anim.play('Fall', { fade: 0.25 }); }
       return;
     }
+    if (!this.legacyAnim) return this.update_ground_v2(dt);
     const { dir, mag } = this.moveInput();
     const sprint = this.input.down('ShiftLeft', 'ShiftRight');
     const walk = this.input.down('KeyC');
@@ -145,6 +175,47 @@ export class Player {
     this.locomotionAnim(hv.length());
   }
 
+  // Velocity follows the body's facing: the character turns first and then
+  // moves where it is facing, so feet never skate sideways. Speed is fed into
+  // the phase-synced locomotion blend space which keeps the planted foot still.
+  update_ground_v2(dt) {
+    const { dir, mag } = this.moveInput();
+    const sprint = this.input.down('ShiftLeft', 'ShiftRight');
+    const walk = this.input.down('KeyC');
+    const maxSpeed = walk ? TUNING.walk : sprint ? TUNING.sprint : TUNING.run;
+    const locked = this.lockMove > 0;
+    let target = locked ? 0 : maxSpeed * mag;
+    if (this.rolling) target = this.rollSpeed;
+    if (mag > 0.1 && !locked && !this.rolling) {
+      const want = Math.atan2(dir.x, dir.z);
+      const diff = Math.abs(Math.atan2(Math.sin(want - this.yaw), Math.cos(want - this.yaw)));
+      // sharp reversal at speed: brake hard while pivoting instead of moonwalking
+      const align = Math.max(0, Math.cos(Math.min(diff, Math.PI / 2)));
+      // reversal: plant and stop first, then turn in place, then accelerate
+      const reversing = diff > 2.0 && this.groundSpeed > 1.2;
+      target *= reversing ? 0 : 0.35 + 0.65 * align;
+      const turnRate = 7 + 9 / (1 + this.groundSpeed * 0.25);
+      if (!reversing) this.faceTowards(dir, dt, turnRate);
+    }
+    const acc = target > this.groundSpeed ? TUNING.accel * (this.groundSpeed < 2 ? 0.7 : 1) : TUNING.decel;
+    this.groundSpeed += THREE.MathUtils.clamp(target - this.groundSpeed, -acc * dt, acc * dt);
+    const f = new THREE.Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw));
+    this.vel.x = f.x * this.groundSpeed;
+    this.vel.z = f.z * this.groundSpeed;
+    const c = this.integrate(dt);
+    if (c.wall) this.groundSpeed = Math.min(this.groundSpeed, Math.hypot(this.vel.x, this.vel.z));
+    if (!c.ground) {
+      this.rolling = false;
+      this.setState('air');
+      this.anim.play('Fall');
+      return;
+    }
+    if (this.rolling && this.game.time > this.rollUntil) this.rolling = false;
+    if (c.wall && mag > 0.5 && dir.dot(c.wall) < -0.6 && this.stateTime > 0.2 && !this.rolling) return this.attachWall(c.wall, c.wallBox);
+    if (this.input.hit('Space') && !locked && !this.rolling) return this.jump(sprint ? 1.12 : 1);
+    if (!this.busy()) this.anim.loco(this.groundSpeed, dt);
+  }
+
   locomotionAnim(speed) {
     if (this.busy()) return;
     const name = speed < 0.3 ? 'Idle' : speed < 3 ? 'Walk' : speed < 7.5 ? 'Run' : 'Sprint';
@@ -157,6 +228,7 @@ export class Player {
 
   jump(mult = 1) {
     this.vel.y = TUNING.jump * mult;
+    this.groundSpeed = 0;
     this.pos.y += 0.05;
     this.setState('air');
     this.anim.play('JumpStart', { loop: false, fade: 0.1 });
@@ -191,6 +263,7 @@ export class Player {
     this.setState('ground');
     this.airAction = null;
     this.emit('land', { vy });
+    if (!this.legacyAnim) return this.landV2(vy);
     if (vy < -20) {
       this.anim.play('LandHard', { loop: false, fade: 0.08 });
       this.actionUntil = this.game.time + 1.0;
@@ -199,6 +272,46 @@ export class Player {
     } else if (vy < -9) {
       this.anim.play('Land', { loop: false, fade: 0.1 });
       this.actionUntil = this.game.time + 0.35;
+    }
+  }
+
+  // Landing picks a clip from impact + horizontal speed and sets the body's
+  // speed to what that clip's feet do (0 for crouches, roll speed for rolls).
+  landV2(vy) {
+    const hs = Math.hypot(this.vel.x, this.vel.z);
+    const { mag } = this.moveInput();
+    const f = new THREE.Vector3(this.vel.x, 0, this.vel.z);
+    if (hs > 0.5) this.yaw = Math.atan2(f.x, f.z);
+    const feet = this.pos.clone().add(new THREE.Vector3(0, -HIP, 0));
+    if (vy < -22 && !(hs > 12 && mag > 0.5)) {
+      this.groundSpeed = 0;
+      this.anim.play('LandHard', { loop: false });
+      this.actionUntil = this.game.time + 1.05;
+      this.lockMove = 0.95;
+      this.game.camRig.shake(0.6, 0.35);
+      this.game.fx?.dust(feet, 28, 7);
+      this.landKind = 'hard';
+    } else if (vy < -10 && hs > 6.5) {
+      // carry momentum through a forward roll; the root moves at roll speed
+      this.rolling = true;
+      this.rollSpeed = Math.min(hs, 8.5);
+      this.groundSpeed = this.rollSpeed;
+      this.rollUntil = this.game.time + 0.7;
+      this.anim.play('Roll', { loop: false, rate: 1.25 });
+      this.actionUntil = this.rollUntil;
+      this.game.fx?.dust(feet, 10, 3);
+      this.landKind = 'roll';
+    } else if (vy < -8 && (hs < 3 || mag < 0.1)) {
+      this.groundSpeed = 0;
+      this.anim.play('Land', { loop: false });
+      this.actionUntil = this.game.time + 0.32;
+      this.lockMove = 0.22;
+      this.landKind = 'land';
+    } else {
+      // light or running landing: straight into the gait at the current speed
+      this.groundSpeed = Math.min(hs, TUNING.sprint);
+      this.anim.loco(this.groundSpeed, 0);
+      this.landKind = 'run';
     }
   }
 
@@ -217,7 +330,7 @@ export class Player {
     this.ropeLen = Math.min(this.ropeLen, this.anchor.y - 2.5);
     this.web.shoot();
     this.setState('swing');
-    this.anim.play('Swing', { fade: 0.18 });
+    this.anim.play('Swing', this.legacyAnim ? { fade: 0.18 } : {});
     this.emit('swing', { anchor: this.anchor });
     return true;
   }
@@ -365,7 +478,12 @@ export class Player {
       return;
     }
     if (this.input.down('ShiftLeft', 'ShiftRight') && a.y > 0 && false) return;
-    this.anim.play(move.lengthSq() > 0.01 ? 'WallCrawl' : 'WallIdle', { fade: 0.2 });
+    if (this.legacyAnim) this.anim.play(move.lengthSq() > 0.01 ? 'WallCrawl' : 'WallIdle', { fade: 0.2 });
+    else {
+      const sp = this.vel.length();
+      if (sp > 0.05) { this.anim.play('WallCrawl'); this.anim.matchSpeed('WallCrawl', sp); }
+      else this.anim.play('WallIdle');
+    }
   }
 
   detachWall(push) {

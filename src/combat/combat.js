@@ -7,6 +7,8 @@ export const MOVES = {
   Kick3: { hit: 10 / 30, end: 22 / 30, dmg: 30, knock: 9, next: 'Punch1' },
 };
 
+const TUNE = { dash: 8.5 };
+
 export class Combat {
   constructor(game) {
     this.game = game;
@@ -61,10 +63,35 @@ export class Combat {
     if (this.combo > 1) this.comboEl.innerHTML = `${this.combo}<small>連擊</small>`;
 
     if (this.move) this.updateMove(dt);
+    else if (this.approach) this.updateApproach(dt);
     else if (this.attackPressed() && p.state === 'ground' && p.lockMove <= 0) {
-      const t = this.pickTarget();
-      this.startMove(this.nextName || 'Punch1', t);
+      const t = this.pickTarget(p.legacyAnim ? 6 : 9);
+      const d = t ? t.pos.distanceTo(p.pos) : 0;
+      // far target: run in with the gait (feet planted) instead of gliding
+      if (t && !p.legacyAnim && d > 2.0) this.approach = { target: t, move: this.nextName || 'Punch1', t: 0 };
+      else this.startMove(this.nextName || 'Punch1', t);
     }
+  }
+
+  updateApproach(dt) {
+    const p = this.player, a = this.approach;
+    a.t += dt;
+    if (this.attackPressed()) a.queued = true;
+    const to = a.target.pos.clone().sub(p.pos); to.y = 0;
+    const d = to.length();
+    if (p.state !== 'ground' || a.t > 1.2 || !a.target.alive) { this.approach = null; return; }
+    if (d < 1.55) {
+      this.approach = null;
+      p.groundSpeed = 0;
+      this.startMove(a.move, a.target);
+      this.queued = !!a.queued;
+      return;
+    }
+    p.faceTowards(to, dt, 16);
+    p.groundSpeed = Math.min(TUNE.dash, p.groundSpeed + 60 * dt);
+    const f = new THREE.Vector3(Math.sin(p.yaw), 0, Math.cos(p.yaw));
+    p.vel.x = f.x * p.groundSpeed; p.vel.z = f.z * p.groundSpeed;
+    p.anim.loco(p.groundSpeed, dt);
   }
 
   updateMove(dt) {
@@ -77,9 +104,20 @@ export class Combat {
       const to = t.pos.clone().sub(p.pos); to.y = 0;
       p.faceTowards(to, dt, 20);
       const d = to.length();
-      // baseline lunge: constant speed toward the target
-      if (d > 1.3) { p.vel.x = to.x / d * 6; p.vel.z = to.z / d * 6; } else { p.vel.x = p.vel.z = 0; }
-    } else if (p.state === 'ground') { p.vel.x *= 0.8; p.vel.z *= 0.8; }
+      if (p.legacyAnim) {
+        // baseline lunge: constant speed toward the target
+        if (d > 1.3) { p.vel.x = to.x / d * 6; p.vel.z = to.z / d * 6; } else { p.vel.x = p.vel.z = 0; }
+      } else {
+        // motion warping: cover exactly the gap left before the impact frame,
+        // so the fist lands on contact and the feet are still at the end
+        const gap = Math.max(0, Math.min(d - (m.contact || 1.05), 0.45));
+        const remain = Math.max(m.hit - this.moveT, dt);
+        const sp = Math.min(gap / remain, 16);
+        p.vel.x = (to.x / (d || 1)) * sp; p.vel.z = (to.z / (d || 1)) * sp;
+      }
+    } else if (p.state === 'ground') {
+      if (p.legacyAnim) { p.vel.x *= 0.8; p.vel.z *= 0.8; } else { p.vel.x = p.vel.z = 0; p.groundSpeed = 0; }
+    }
     if (!this.hitDone && this.moveT >= m.hit) {
       this.hitDone = true;
       this.resolveHit(m);
