@@ -1,54 +1,106 @@
 import * as THREE from 'three';
+import { Sky } from 'three/addons/objects/Sky.js';
+
+// Presentation stack per xikhar/atlas `threejs-pipeline`: physically based sky
+// dome, PMREM image-based lighting from that same sky, one warm key light
+// with an adaptive shadow frustum, cool sky fill, and aerial-perspective haze
+// matched to the horizon so the far city dissolves instead of ending.
+export const SUN = { elevation: 34, azimuth: 295 };
+export const HAZE = '#c3ccd5';
 
 export function setupSky(scene, renderer, quality) {
-  const top = new THREE.Color('#5d8fd0');
-  const bottom = new THREE.Color('#f3c9a0');
-  const skyGeo = new THREE.SphereGeometry(1400, 24, 12);
-  const skyMat = new THREE.ShaderMaterial({
-    side: THREE.BackSide,
-    depthWrite: false,
-    fog: false,
-    uniforms: { top: { value: top }, bottom: { value: bottom }, sunDir: { value: new THREE.Vector3(0.45, 0.35, 0.3).normalize() } },
-    vertexShader: `varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); gl_Position.z = gl_Position.w; }`,
-    fragmentShader: `uniform vec3 top; uniform vec3 bottom; uniform vec3 sunDir; varying vec3 vDir;
-      void main(){ float h = clamp(vDir.y*1.6+0.15,0.0,1.0); vec3 c = mix(bottom, top, pow(h,0.7));
-        float s = max(dot(normalize(vDir), sunDir),0.0); c += vec3(1.0,0.8,0.55)*pow(s,180.0)*2.0 + vec3(1.0,0.7,0.4)*pow(s,8.0)*0.25;
-        gl_FragColor = vec4(c,1.0); }`,
-  });
-  const sky = new THREE.Mesh(skyGeo, skyMat);
-  sky.renderOrder = -1;
+  const sky = new Sky();
+  sky.scale.setScalar(9000);
+  const u = sky.material.uniforms;
+  u.turbidity.value = 5.5;
+  u.rayleigh.value = 1.35;
+  u.mieCoefficient.value = 0.004;
+  u.mieDirectionalG.value = 0.78;
+  const sunDir = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - SUN.elevation), THREE.MathUtils.degToRad(SUN.azimuth));
+  u.sunPosition.value.copy(sunDir);
   scene.add(sky);
-  scene.fog = new THREE.Fog('#c9b8a8', 120, quality === 'low' ? 420 : 620);
 
-  // environment map from the sky dome so glass towers reflect the sunset
-  const envScene = new THREE.Scene();
-  envScene.add(new THREE.Mesh(skyGeo, skyMat.clone()));
+  // IBL from the sky itself (neutral daylight, no extra fill lights needed)
   const pm = new THREE.PMREMGenerator(renderer);
-  scene.environment = pm.fromScene(envScene, 0.02).texture;
-  scene.environmentIntensity = 0.6;
+  const envScene = new THREE.Scene();
+  const envSky = new Sky();
+  envSky.scale.setScalar(1000);
+  Object.assign(envSky.material.uniforms.sunPosition.value, sunDir);
+  for (const k of ['turbidity', 'rayleigh', 'mieCoefficient', 'mieDirectionalG']) envSky.material.uniforms[k].value = u[k].value;
+  envScene.add(envSky);
+  // a dim ground so reflections below the horizon read as street, not sky
+  const g = new THREE.Mesh(new THREE.CircleGeometry(900, 16), new THREE.MeshBasicMaterial({ color: '#4a4c50' }));
+  g.rotation.x = -Math.PI / 2; g.position.y = -20;
+  envScene.add(g);
+  const env = pm.fromScene(envScene, 0.015, 1, 3000).texture;
+  scene.environment = env;
+  scene.environmentIntensity = 0.16;
   pm.dispose();
 
-  const hemi = new THREE.HemisphereLight('#bcd4ff', '#5a4a3c', 1.1);
+  // horizon haze band: fades the land's far edge into the sky so the world
+  // never ends in a visible line (drawn right after the sky dome)
+  const bandMat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, fog: false, side: THREE.BackSide,
+    uniforms: { uColor: { value: new THREE.Color(HAZE) } },
+    vertexShader: `varying float vH; void main(){ vH = position.y; vec4 p = projectionMatrix*modelViewMatrix*vec4(position,1.0); gl_Position = p; gl_Position.z = gl_Position.w * 0.99999; }`,
+    fragmentShader: `uniform vec3 uColor; varying float vH; void main(){ float a = 1.0 - smoothstep(-40.0, 420.0, vH); gl_FragColor = vec4(uColor, a);
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
+    }`,
+  });
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(7000, 7000, 3000, 48, 1, true), bandMat);
+  band.renderOrder = -1;
+  band.frustumCulled = false;
+  scene.add(band);
+
+  const far = quality === 'low' ? 1500 : 2600;
+  scene.fog = new THREE.Fog(HAZE, quality === 'low' ? 180 : 320, far);
+
+  const hemi = new THREE.HemisphereLight('#cfdcf0', '#77705f', 0.35);
   scene.add(hemi);
-  const sun = new THREE.DirectionalLight('#ffe2bf', 2.6);
-  sun.position.set(90, 70, 60);
-  if (quality !== 'low') {
+  const sun = new THREE.DirectionalLight('#ffeed6', 3.2);
+  const shadows = quality !== 'low';
+  if (shadows) {
     sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
-    const s = sun.shadow.camera;
-    s.left = -60; s.right = 60; s.top = 60; s.bottom = -60; s.near = 1; s.far = 400;
-    sun.shadow.bias = -0.0005;
-    sun.shadow.normalBias = 0.04;
+    sun.shadow.mapSize.set(4096, 4096);
+    sun.shadow.bias = -0.0002;
+    sun.shadow.normalBias = 0.35;
   }
   scene.add(sun, sun.target);
+  const focus = new THREE.Vector3();
+  let lastSpan = 0;
   return {
     sky,
     sun,
-    update(focus) {
-      sky.position.copy(focus);
-      // keep the shadow frustum centred on the player
-      sun.position.set(focus.x + 90, focus.y + 110, focus.z + 60);
+    sunDir,
+    // Fit the single shadow frustum to what the camera can resolve: tight and
+    // sharp near the street, widening with altitude so a rooftop dive still
+    // shows every tower's shadow across the avenues below.
+    update(player, camera) {
+      sky.position.copy(camera.position);
+      band.position.set(camera.position.x, 0, camera.position.z);
+      const alt = Math.max(0, camera.position.y);
+      const span = THREE.MathUtils.clamp(70 + alt * 2.2, 70, 700);
+      const fwd = new THREE.Vector3();
+      camera.getWorldDirection(fwd);
+      fwd.y = 0;
+      if (fwd.lengthSq() > 1e-4) fwd.normalize();
+      focus.copy(player).addScaledVector(fwd, span * 0.45);
+      focus.y = 0;
+      // snap to shadow texels so the map does not shimmer while moving
+      const texel = (span * 2) / 4096;
+      focus.x = Math.round(focus.x / texel) * texel;
+      focus.z = Math.round(focus.z / texel) * texel;
       sun.target.position.copy(focus);
+      sun.position.copy(focus).addScaledVector(sunDir, 1400);
+      if (shadows && Math.abs(span - lastSpan) > span * 0.08) {
+        const s = sun.shadow.camera;
+        s.left = -span; s.right = span; s.top = span; s.bottom = -span;
+        s.near = 10; s.far = 2600;
+        s.updateProjectionMatrix();
+        sun.shadow.normalBias = 0.2 + span * 0.004;
+        lastSpan = span;
+      }
     },
   };
 }

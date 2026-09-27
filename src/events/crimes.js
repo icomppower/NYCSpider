@@ -38,7 +38,11 @@ export class CrimeSystem {
   sidewalkPoint(near, dist) {
     let best = null, bestErr = Infinity;
     for (let k = 0; k < 60; k++) {
-      const i = Math.floor(this.rng() * L.NX), j = Math.floor(this.rng() * L.NZ);
+      // sample blocks around `near` (the grid is too big to sample uniformly)
+      const bi = Math.round((near.x - blockRect(0, 0).x0) / (L.BLOCK_W + L.AVENUE)), bj = Math.round((near.z - blockRect(0, 0).z0) / (L.BLOCK_D + L.STREET));
+      const span = Math.ceil(dist / 80) + 1;
+      const i = Math.max(0, Math.min(L.NX - 1, bi + Math.floor(this.rng() * (span * 2 + 1)) - span));
+      const j = Math.max(0, Math.min(L.NZ - 1, bj + Math.floor(this.rng() * (span * 2 + 1)) - span));
       const r = blockRect(i, j);
       const side = Math.floor(this.rng() * 4);
       const u = this.rng();

@@ -35,6 +35,24 @@ export class GeoBuilder {
   top(x0, z0, x1, z1, y, tile = 4) {
     this.quad([x0, y, z1], [x1, y, z1], [x1, y, z0], [x0, y, z0], [0, 1, 0], [[x0 / tile, z1 / tile], [x1 / tile, z1 / tile], [x1 / tile, z0 / tile], [x0 / tile, z0 / tile]]);
   }
+  // Convex polygon (array of [x, z], any winding) as an up-facing fan.
+  poly(pts, y, tile = 4) {
+    if (pts.length < 3) return;
+    let area = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const [ax, az] = pts[i], [bx, bz] = pts[(i + 1) % pts.length];
+      area += ax * bz - bx * az;
+    }
+    const P = area > 0 ? [...pts].reverse() : pts; // negative x/z area + (0,i,i+1) faces +y (same as top())
+    const base = this.pos.length / 3;
+    for (const [x, z] of P) {
+      this.pos.push(x, y, z);
+      this.nrm.push(0, 1, 0);
+      this.col.push(...this.color);
+      this.uv.push(x / tile, z / tile);
+    }
+    for (let i = 1; i < P.length - 1; i++) this.idx.push(base, base + i, base + i + 1);
+  }
   bottom(x0, z0, x1, z1, y) {
     this.quad([x0, y, z0], [x1, y, z0], [x1, y, z1], [x0, y, z1], [0, -1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
   }

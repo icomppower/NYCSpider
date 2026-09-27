@@ -70,6 +70,7 @@ export class Player {
     this.prevState = prev;
     this.state = s;
     this.stateTime = 0;
+    if (s !== 'air') this.endDive();
     this.emit('state', { prev, next: s });
   }
 
@@ -122,7 +123,8 @@ export class Player {
   // ------------------------------------------------------------ physics helpers
   integrate(dt, gravity = G) {
     this.vel.y -= gravity * dt;
-    if (this.vel.y < -48) this.vel.y = -48;
+    const term = this.diving ? -62 : -48;
+    if (this.vel.y < term) this.vel.y += (term - this.vel.y) * Math.min(1, dt * 3);
     // sub-step to avoid tunnelling at swing speeds
     const steps = Math.max(1, Math.ceil((this.vel.length() * dt) / 0.3));
     const h = dt / steps;
@@ -246,13 +248,15 @@ export class Player {
     }
     if (this.airGravity && this.vel.y < -2) this.airGravity = null;
     const { dir, mag } = this.moveInput();
+    this.updateDive(dt);
     const hv = new THREE.Vector3(this.vel.x, 0, this.vel.z);
-    const cap = Math.max(TUNING.run, hv.length());
-    hv.addScaledVector(dir, TUNING.airAccel * mag * dt);
+    // diving: steer like a skydiver (tracking) with a higher horizontal cap
+    const cap = this.diving ? Math.max(24, hv.length()) : Math.max(TUNING.run, hv.length());
+    hv.addScaledVector(dir, (this.diving ? 22 : TUNING.airAccel) * mag * dt);
     hv.clampLength(0, cap);
     this.vel.x = hv.x; this.vel.z = hv.z;
     if (hv.lengthSq() > 1) this.faceTowards(hv, dt, 4);
-    if (this.anim.currentName === 'JumpStart' && this.vel.y < 0) this.anim.play('Fall', { fade: 0.3 });
+    if (this.anim.currentName === 'JumpStart' && this.vel.y < 0 && !this.diving) this.anim.play('Fall', { fade: 0.3 });
 
     if (this.input.down('ShiftLeft', 'ShiftRight') && this.stateTime > (this.prevState === 'swing' ? 0.3 : 0.12) && !this.airAction) {
       if (this.trySwing()) return;
@@ -267,7 +271,32 @@ export class Player {
     this.lastVy = this.vel.y;
   }
 
+  // Skydive: free-falling from height switches to a spread-eagle dive pose,
+  // pitched toward the ground; pulling out (web, wall, low altitude) exits.
+  altitude() {
+    return this.pos.y - HIP - this.collision.groundAt(this.pos.x, this.pos.z, this.pos.y - HIP, 0.2);
+  }
+  updateDive(dt) {
+    const alt = this.altitude();
+    if (!this.diving && !this.airAction && this.vel.y < -13 && alt > 24) {
+      this.diving = true;
+      this.diveT = 0;
+      this.anim.play('Dive', { fade: 0.35 });
+      this.emit('dive', { on: true });
+    } else if (this.diving && (this.vel.y > -6 || alt < 9 || this.airAction)) {
+      this.endDive();
+      if (!this.airAction) this.anim.play('Fall', { fade: 0.25 });
+    }
+    if (this.diving) this.diveT += dt;
+  }
+  endDive() {
+    if (!this.diving) return;
+    this.diving = false;
+    this.emit('dive', { on: false });
+  }
+
   land(vy) {
+    this.endDive();
     this.setState('ground');
     this.airAction = null;
     this.airGravity = null;
@@ -539,8 +568,14 @@ export class Player {
       q.setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, up, fwd));
     } else {
       q.setFromAxisAngle(UP, this.yaw);
+      if (this.diving) {
+        // nose toward the ground in proportion to how vertical the fall is
+        const hs = Math.hypot(this.vel.x, this.vel.z);
+        const pitch = THREE.MathUtils.clamp(Math.atan2(-this.vel.y, hs + 4), 0.2, 1.35) * Math.min(1, this.diveT * 2);
+        q.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), pitch));
+      }
     }
-    this.orient.slerp(q, Math.min(1, dt * (this.state === 'wall' ? 12 : 10)));
+    this.orient.slerp(q, Math.min(1, dt * (this.state === 'wall' ? 12 : this.diving ? 5 : 10)));
     this.root.quaternion.copy(this.orient);
   }
 }

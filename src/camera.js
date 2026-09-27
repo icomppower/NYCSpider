@@ -46,11 +46,13 @@ export class CameraRig {
       let d = want - this.yaw;
       d = Math.atan2(Math.sin(d), Math.cos(d));
       this.yaw += d * Math.min(1, dt * (player.state === 'swing' ? 1.6 : 0.9));
-      const wantPitch = player.state === 'swing' || player.state === 'air' ? 0.12 : 0.2;
+      const wantPitch = player.diving ? 0.95 : player.state === 'swing' || player.state === 'air' ? 0.12 : 0.2;
       this.pitch += (wantPitch - this.pitch) * Math.min(1, dt * 0.8);
     }
     const speed = v.length();
-    const wantDist = (player.state === 'wall' ? 4.2 : 4.6) + Math.min(3.2, speed * 0.12) + (player.combat?.inCombat ? 1.2 : 0);
+    const wantDist = (player.state === 'wall' ? 4.2 : 4.6) + Math.min(3.2, speed * 0.12) + (player.combat?.inCombat ? 1.2 : 0) + (player.diving ? 2.5 : 0);
+    // in a dive the camera rides above and behind, looking down the fall line
+    if (player.diving && this.idleLook > 0.4) this.pitch += (0.95 - this.pitch) * Math.min(1, dt * 1.5);
     this.dist += (wantDist - this.dist) * Math.min(1, dt * 3);
     const tgt = player.pos.clone().add(new THREE.Vector3(0, 0.75, 0));
     this.target.lerp(tgt, Math.min(1, dt * 14));
@@ -82,7 +84,8 @@ export class CameraRig {
       if (this.shakeT <= 0) this.shakeAmp = 0;
     }
     this.cam.lookAt(look);
-    const fov = this.fovBase + Math.min(18, Math.max(0, speed - 8) * 0.7);
+    const fov = this.fovBase + Math.min(player.diving ? 26 : 18, Math.max(0, speed - 8) * 0.7);
+    if (player.diving && speed > 40) { this.cam.position.x += (Math.random() - 0.5) * 0.04; this.cam.position.y += (Math.random() - 0.5) * 0.04; }
     this.cam.fov += (fov - this.cam.fov) * Math.min(1, dt * 3);
     this.cam.updateProjectionMatrix();
   }

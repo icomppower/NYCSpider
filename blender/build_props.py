@@ -208,6 +208,41 @@ def build_props():
         cone("sp_a", (0, 0, 4.5), 2.2, 9, steel, 8),
         cylinder("sp_needle", (0, 0, 11), 0.12, 5, steel, 6),
     ])
+    # ---- plaza & waterfront set dressing
+    stone = material("PlazaStone", (0.72, 0.68, 0.6), rough=0.8)
+    water = material("FountainWater", (0.35, 0.5, 0.58), rough=0.05, metal=0.2)
+    fn = [cylinder("fn_basin", (0, 0, 0.3), 4.2, 0.6, stone, 24),
+          cylinder("fn_water", (0, 0, 0.55), 3.8, 0.1, water, 24),
+          cylinder("fn_ped", (0, 0, 1.1), 0.5, 1.4, stone, 12),
+          cylinder("fn_bowl", (0, 0, 1.85), 1.3, 0.25, stone, 16),
+          cylinder("fn_jet", (0, 0, 2.6), 0.08, 1.4, water, 8)]
+    group("Fountain", fn)
+    red = material("UmbrellaRed", (0.62, 0.08, 0.07), rough=0.7)
+    cafe = [cylinder("ct_top", (0, 0, 0.74), 0.4, 0.04, M["metal"], 12),
+            cylinder("ct_leg", (0, 0, 0.37), 0.04, 0.74, M["metal"], 6),
+            cylinder("ct_pole", (0, 0, 1.3), 0.03, 1.8, M["metal"], 6),
+            cone("ct_umb", (0, 0, 2.2), 1.2, 0.45, red, 8)]
+    for i in range(3):
+        a = i / 3 * math.tau
+        cafe.append(box(f"ct_chair{i}", (0.75 * math.cos(a), 0.75 * math.sin(a), 0.23), (0.4, 0.4, 0.46), M["metal"]))
+    group("CafeTable", cafe)
+    group("Planter", [box("pl_box", (0, 0, 0.35), (1.6, 1.6, 0.7), stone, bevel=0.05),
+                      ellipsoid("pl_bush", (0, 0, 0.95), (0.8, 0.8, 0.5), M["leaf"], 8, 5)])
+    rail = [box("rl_top", (0, 0, 1.05), (4.0, 0.08, 0.08), M["metal"]),
+            box("rl_mid", (0, 0, 0.55), (4.0, 0.04, 0.04), M["metal"])]
+    for x in (-1.95, 0.0, 1.95):
+        rail.append(box(f"rl_post{x}", (x, 0, 0.52), (0.07, 0.07, 1.05), M["metal"]))
+    group("Railing", rail)
+    # rooftop kit: stair bulkhead, cooling tower, skylight
+    group("Bulkhead", [box("bh", (0, 0, 1.7), (3.2, 4.2, 3.4), material("BulkheadBrick", (0.45, 0.28, 0.22), rough=0.9)),
+                       box("bh_door", (0, -2.11, 1.1), (1.0, 0.04, 2.1), M["metal"]),
+                       box("bh_cap", (0, 0, 3.45), (3.4, 4.4, 0.12), M["concrete"])])
+    group("CoolingTower", [box("ct_box", (0, 0, 1.4), (4.4, 3.0, 2.8), material("CoolingGrey", (0.62, 0.63, 0.64), rough=0.6, metal=0.3)),
+                           cylinder("ct_fan1", (-1.1, 0, 2.85), 0.9, 0.12, M["metal"], 14),
+                           cylinder("ct_fan2", (1.1, 0, 2.85), 0.9, 0.12, M["metal"], 14)])
+    glassm = material("SkylightGlass", (0.2, 0.26, 0.3), rough=0.1, metal=0.4)
+    group("Skylight", [box("sk_curb", (0, 0, 0.2), (2.4, 3.2, 0.4), M["concrete"]),
+                       box("sk_glass", (0, 0, 0.5), (2.2, 3.0, 0.25), glassm)])
     export_glb(os.path.join(OUT, "props.glb"), {"export_animations": False})
 
 

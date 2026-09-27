@@ -32,6 +32,13 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d12; fon
 .suit-card .swatch img { height: 100%; filter: drop-shadow(0 6px 12px rgba(0,0,0,.6)); }
 #score { position: absolute; left: 24px; top: 66px; font-size: 14px; text-shadow: 0 1px 3px #000; }
 #score b { font-size: 18px; color: #ffd24a; }
+#objective { position: absolute; left: 24px; top: 100px; min-width: 230px; padding: 8px 12px 9px; background: linear-gradient(90deg, rgba(8,12,20,.72), rgba(8,12,20,0)); border-left: 3px solid #5fd2ff; text-shadow: 0 1px 3px #000; }
+#objective .obj-title { font-size: 11px; letter-spacing: .22em; color: #5fd2ff; font-weight: 700; }
+#objective .obj-main { font-size: 17px; font-weight: 700; margin-top: 2px; }
+#objective .obj-sub { font-size: 12px; opacity: .8; margin-top: 2px; }
+#obj-marker { position: absolute; display: none; transform: translate(-50%, -100%); pointer-events: none; text-align: center; font-size: 12px; font-weight: 700; color: #bfefff; text-shadow: 0 1px 3px #000; }
+#obj-marker i { display: block; width: 18px; height: 18px; margin: 0 auto 2px; border: 2px solid #5fd2ff; transform: rotate(45deg); background: rgba(95,210,255,.25); box-shadow: 0 0 10px rgba(95,210,255,.7); }
+#obj-marker.edge i { background: #5fd2ff; }
 #overlay { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: radial-gradient(ellipse at center, rgba(8,10,18,.55), rgba(5,6,10,.9)); padding: 16px; }
 #overlay.hidden, .panel.hidden, .hidden { display: none !important; }
 .panel { max-width: 520px; width: 100%; text-align: center; }
@@ -65,6 +72,7 @@ body.touch #help { display: none; }
   #hp { left: 16px; top: 16px; width: 150px; }
   #suit-tag { left: 16px; top: 34px; font-size: 11px; }
   #score { left: 16px; top: 54px; font-size: 12px; } #score b { font-size: 15px; }
+  #objective { left: 16px; top: 80px; min-width: 0; padding: 6px 10px; } #objective .obj-main { font-size: 14px; }
   #minimap { right: 12px; top: 12px; width: 110px; height: 110px; }
   #crime { right: 12px; top: 130px; width: 170px; font-size: 12px; }
   #alert { font-size: 18px; width: 90%; }

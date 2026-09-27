@@ -214,6 +214,22 @@ def fall():
     return [(0, fall_pose(0)), (12, fall_pose(1)), (24, fall_pose(0))]
 
 
+def dive_pose(t):
+    """Skydive from a rooftop: back arched, head up, arms spread and swept back,
+    legs long with a slight split. The game pitches the whole body toward the
+    ground; this clip only shapes the limbs (t drives a gentle wind flutter)."""
+    p = {"spine": (-14, 0, 0), "chest": (-6, 0, 0), "head": (-34, 0, 0)}
+    leg_raw(p, "L", x=10 + 5 * t, y=-12, sx=14 + 10 * t, fx=28)
+    leg_raw(p, "R", x=4 - 5 * t, y=-12, sx=22 - 8 * t, fx=28)
+    arm(p, "L", y=6 - 8 * t, z=32, fz=-10 - 6 * t)
+    arm(p, "R", y=4 + 8 * t, z=34, fz=-14 + 6 * t)
+    return p
+
+
+def dive():
+    return [(0, dive_pose(0)), (15, dive_pose(1)), (30, dive_pose(0))]
+
+
 def crouch_land(drop, spread=STANCE, lean=25):
     p = {"hips@loc": (0, 0, -drop), "spine": (lean, 0, 0), "head": (-lean * 0.8, 0, 0)}
     leg_ik(p, "L", spread, hip_drop=drop, splay=-12)
@@ -570,7 +586,7 @@ def wave():
 # clip name -> (factory, loop)
 HERO_CLIPS = {
     "Idle": (idle, True), "Walk": (walk, True), "Run": (run, True), "Sprint": (sprint, True),
-    "JumpStart": (jump_start, False), "Fall": (fall, True), "Land": (land, False),
+    "JumpStart": (jump_start, False), "Fall": (fall, True), "Dive": (dive, True), "Land": (land, False),
     "LandHard": (land_hard, False), "Roll": (roll, False),
     "Swing": (swing, False), "SwingFlip": (swing_flip, False), "WebZip": (web_zip, True),
     "WallIdle": (wall_idle, True), "WallCrawl": (wall_crawl, True),

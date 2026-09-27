@@ -56,9 +56,15 @@ export class Traffic {
     const axis = this.rng() < 0.55 ? 'z' : 'x';
     const dir = this.rng() < 0.5 ? 1 : -1;
     const lane = T.name === 'Bus' ? 1 : this.rng() < 0.5 ? 0 : 1;
+    // spawn on a road near the player: the grid is far bigger than the car budget
+    const P = this.game.player?.pos || new THREE.Vector3();
+    const ri = (n) => Math.floor(this.rng() * n);
+    const clampI = (v, n) => Math.max(0, Math.min(n, v));
+    const ai = clampI(Math.round((P.x - avenueX(0)) / (L.BLOCK_W + L.AVENUE)) + ri(7) - 3, L.NX);
+    const sj = clampI(Math.round((P.z - streetZ(0)) / (L.BLOCK_D + L.STREET)) + ri(5) - 2, L.NZ);
     let line, s;
-    if (axis === 'z') { line = avenueX(Math.floor(this.rng() * (L.NX + 1))); s = streetZ(0) + this.rng() * (streetZ(L.NZ) - streetZ(0)); }
-    else { line = streetZ(Math.floor(this.rng() * (L.NZ + 1))); s = avenueX(0) + this.rng() * (avenueX(L.NX) - avenueX(0)); }
+    if (axis === 'z') { line = avenueX(ai); s = THREE.MathUtils.clamp(P.z + (this.rng() - 0.5) * 360, streetZ(0), streetZ(L.NZ)); }
+    else { line = streetZ(sj); s = THREE.MathUtils.clamp(P.x + (this.rng() - 0.5) * 360, avenueX(0), avenueX(L.NX)); }
     // don't spawn inside an intersection box or on top of another car
     for (const c of this.cars) if (c.axis === axis && c.line === line && c.dir === dir && c.lane === lane && Math.abs(c.s - s) < 14) return;
     const car = {
@@ -151,6 +157,15 @@ export class Traffic {
       // left the grid: respawn somewhere else
       const lo = c.axis === 'z' ? streetZ(0) : avenueX(0), hi = c.axis === 'z' ? streetZ(L.NZ) : avenueX(L.NX);
       if (c.s < lo - 12 || c.s > hi + 12) { Object.assign(c, { s: c.dir > 0 ? lo : hi }); this.place(c); }
+      // recycle cars that drifted out of view range back near the player
+      if (!c.turn && (c.recycleT = (c.recycleT || 0) + dt) > 2) {
+        c.recycleT = 0;
+        if (c.pos.distanceToSquared(P) > 300 * 300) {
+          const i = this.cars.indexOf(c);
+          this.cars.splice(i, 1);
+          if (!this.spawnRandom()) this.cars.splice(i, 0, c);
+        }
+      }
     }
     this.pushPlayer();
     this.render();
