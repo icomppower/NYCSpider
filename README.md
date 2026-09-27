@@ -2,6 +2,14 @@
 
 Three.js 開放世界蜘蛛人原型。角色、動畫、車輛與街道道具全部由 `blender/` 內的 Python 腳本在 Blender (bpy) 中程序化產生，匯出為 glTF (`public/models/*.glb`)。
 
+**線上遊玩：https://icomppower.github.io/NYCSpider/** （推送到預設分支即由 GitHub Actions 自動部署；手機可用觸控操作）
+
+## 遊戲目標
+
+阻止 8 起街頭犯罪即勝利；蜘蛛人倒下或 3 起犯罪逃走即失敗。跟著紅色光柱與小地圖紅點前往現場。5 秒未受傷會回血。流程在 `src/game/run.js`，觸控操作在 `src/ui/touch.js`（左半邊搖桿、右半邊視角、右下動作鈕）。`?play=1` 跳過標題、`?touch` 在桌機強制觸控介面。
+
+詳細進度見 Notion：[NYC Spider — 開發進度](https://app.notion.com/p/3e71f269eaea81809203d4470d7d24b5)
+
 ## 開發
 
 ```bash
