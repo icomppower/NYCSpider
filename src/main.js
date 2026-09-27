@@ -16,14 +16,18 @@ import { SuitMenu } from './ui/menu.js';
 import { CrimeSystem } from './events/crimes.js';
 import { Traffic } from './world/traffic.js';
 import { Pedestrians } from './world/pedestrians.js';
+import { Run } from './game/run.js';
+import { TouchControls } from './ui/touch.js';
 
 const params = new URLSearchParams(location.search);
-const quality = params.get('q') || 'high';
+const touch = matchMedia('(pointer: coarse)').matches || params.has('touch');
+const quality = params.get('q') || (touch ? 'low' : 'high');
 
 class Game {
   async init() {
     this.params = params;
     this.quality = quality;
+    this.touch = touch;
     const renderer = (this.renderer = new THREE.WebGLRenderer({ antialias: quality !== 'low', preserveDrawingBuffer: params.has('capture') }));
     renderer.setPixelRatio(quality === 'low' ? 1 : Math.min(devicePixelRatio, 2));
     renderer.setSize(innerWidth, innerHeight);
@@ -58,6 +62,8 @@ class Game {
     this.peds = new Pedestrians(this, quality === 'low' ? 10 : 18);
     this.systems = [this.combat, this.npcs, this.fx, this.crimes, this.traffic, this.peds];
     this.hitStopT = 0;
+    this.run = new Run(this);
+    if (touch) this.touchUI = new TouchControls(this);
     addEventListener('resize', () => this.resize());
     document.getElementById('loading').remove();
     this.clock = new THREE.Clock();
@@ -78,7 +84,7 @@ class Game {
   // deterministic stepping for scripted capture: game.step(1/30) from Playwright
   hitStop(t) { this.hitStopT = Math.max(this.hitStopT, t); }
   step(raw) {
-    this.menu.update();
+    if (this.run.live) this.menu.update();
     if (this.paused) { this.input.endFrame(); return; }
     let dt = raw * this.timeScale;
     if (this.hitStopT > 0) { this.hitStopT -= raw; dt *= 0.05; }
@@ -92,6 +98,7 @@ class Game {
     this.camRig.update(raw, this.player);
     this.sky.update(this.player.pos);
     this.hud.update(dt, raw);
+    this.run.update(dt);
     this.input.endFrame();
   }
   render() {

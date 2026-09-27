@@ -341,6 +341,7 @@ export class Combat {
     const p = this.player;
     if (p.invuln > this.game.time || this.move === 'Uppercut') return;
     p.health -= dmg;
+    this.game.run?.onPlayerHit();
     this.combo = 0;
     this.move = null;
     this.approach = null;
@@ -352,8 +353,8 @@ export class Combat {
       p.vel.addScaledVector(dir, 3);
     }
     if (p.health <= 0) {
-      p.health = 100;
-      this.game.hud.toast('蜘蛛人倒下了……體力恢復');
+      p.health = 0;
+      this.game.run?.onPlayerDown();
     }
   }
 }

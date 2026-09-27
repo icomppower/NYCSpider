@@ -4,3 +4,4 @@ recordings/raw/
 *.blend1
 __pycache__/
 recordings/
+tools/tmp/

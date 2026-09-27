@@ -2,15 +2,17 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🕷</text></svg>" />
   <title>NYC Spider</title>
-  <link rel="stylesheet" href="/src/ui/style.css" />
+  <link rel="stylesheet" href="./src/ui/style.css" />
 </head>
 <body>
   <div id="app"></div>
   <div id="hud">
     <div id="hp"><div id="hp-fill"></div></div>
     <div id="suit-tag"></div>
+    <div id="score"></div>
     <div id="combo"></div>
     <div id="alert"></div>
     <div id="crime"></div>
@@ -26,7 +28,37 @@
     <div id="suit-cards"></div>
     <p class="hint">Tab / Esc 關閉</p>
   </div>
+  <div id="touch" class="hidden"><div id="stick"><div id="knob"></div></div></div>
+  <div id="overlay" class="hidden">
+    <div class="panel" id="panel-title">
+      <h1>NYC SPIDER</h1>
+      <p class="tag">紐約夜巡 · 阻止 8 起街頭犯罪</p>
+      <ul class="howto desk">
+        <li><b>WASD</b> 移動　<b>滑鼠</b> 視角　<b>Space</b> 跳躍</li>
+        <li><b>Shift</b> 擺盪（按住連續擺盪）/ 地面跑酷</li>
+        <li><b>左鍵</b> 攻擊連段　<b>右鍵</b> 上勾拳挑空</li>
+        <li><b>E</b> 蛛絲拉扯　<b>F</b> 蛛絲衝刺　<b>Tab</b> 戰衣</li>
+      </ul>
+      <ul class="howto mob">
+        <li>左半邊拖曳 移動　右半邊拖曳 視角</li>
+        <li>按住「擺盪」在大樓間飛行</li>
+        <li>「攻擊」連段 ·「挑空」接空中連段</li>
+      </ul>
+      <p class="tag small">跟著紅色光柱與小地圖紅點前往犯罪現場。逃走 3 起或倒下即失敗。</p>
+      <button id="start-btn" class="big">開始巡邏</button>
+    </div>
+    <div class="panel hidden" id="panel-pause">
+      <h1>暫停</h1>
+      <button id="resume-btn" class="big">繼續</button>
+    </div>
+    <div class="panel hidden" id="panel-end">
+      <h1 id="end-title"></h1>
+      <p id="end-stats"></p>
+      <button id="retry-btn" class="big">再來一次</button>
+      <button id="continue-btn" class="big alt">自由巡邏</button>
+    </div>
+  </div>
   <div id="loading">載入中…</div>
-  <script type="module" src="/src/main.js"></script>
+  <script type="module" src="./src/main.js"></script>
 </body>
 </html>

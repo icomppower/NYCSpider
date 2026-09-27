@@ -25,7 +25,7 @@ export class CrimeSystem {
     this.game = game;
     this.active = [];
     this.history = [];
-    this.timer = 18;
+    this.timer = 6;
     this.autoSpawn = !game.params.has('capture');
     this.xp = 0;
     this.panel = document.getElementById('crime');
@@ -54,7 +54,7 @@ export class CrimeSystem {
     return best;
   }
 
-  spawn(type, near = this.game.player.pos, dist = 60 + Math.random() * 90) {
+  spawn(type, near = this.game.player.pos, dist = (this.history.length ? 60 : 35) + Math.random() * (this.history.length ? 90 : 20)) {
     const T = CRIME_TYPES[type] || CRIME_TYPES.mugging;
     const { p: pos, side } = this.sidewalkPoint(near, dist);
     // direction toward the street (thugs stand street-side of the victim)
@@ -95,7 +95,7 @@ export class CrimeSystem {
     if (this.autoSpawn && !this.active.length) {
       this.timer -= dt;
       if (this.timer <= 0) {
-        this.timer = 25 + Math.random() * 25;
+        this.timer = 10 + Math.random() * 10;
         const types = Object.keys(CRIME_TYPES);
         this.spawn(types[Math.floor(Math.random() * types.length)]);
       }
@@ -118,6 +118,7 @@ export class CrimeSystem {
     c.state = ok ? 'resolved' : 'failed';
     this.game.scene.remove(c.beacon);
     this.history.push({ type: c.type, ok, t: +c.t.toFixed(1) });
+    this.game.run?.onCrime(ok);
     if (ok) {
       const xp = 100 + c.thugs.length * 25;
       this.xp += xp;

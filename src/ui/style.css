@@ -30,3 +30,45 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d12; fon
 #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 22px; letter-spacing: .3em; background: #0b0d12; }
 .suit-card .swatch { height: 260px; display: flex; align-items: flex-end; justify-content: center; position: relative; overflow: hidden; }
 .suit-card .swatch img { height: 100%; filter: drop-shadow(0 6px 12px rgba(0,0,0,.6)); }
+#score { position: absolute; left: 24px; top: 66px; font-size: 14px; text-shadow: 0 1px 3px #000; }
+#score b { font-size: 18px; color: #ffd24a; }
+#overlay { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: radial-gradient(ellipse at center, rgba(8,10,18,.55), rgba(5,6,10,.9)); padding: 16px; }
+#overlay.hidden, .panel.hidden, .hidden { display: none !important; }
+.panel { max-width: 520px; width: 100%; text-align: center; }
+.panel h1 { font-size: clamp(34px, 9vw, 64px); letter-spacing: .12em; margin: 0 0 8px; font-weight: 900; font-style: italic; color: #ff3b3b; text-shadow: 0 4px 24px rgba(255,40,40,.4); }
+.panel .tag { font-size: 18px; margin: 0 0 18px; opacity: .9; }
+.panel .tag.small { font-size: 13px; opacity: .65; margin-top: 14px; }
+.howto { list-style: none; padding: 0; margin: 0; font-size: 14px; line-height: 2; opacity: .85; }
+.howto b { color: #ffd24a; font-weight: 600; }
+.howto.mob { display: none; }
+body.touch .howto.desk { display: none; } body.touch .howto.mob { display: block; }
+#end-stats { font-size: 17px; line-height: 1.9; } #end-stats b { color: #ffd24a; }
+button.big { display: block; margin: 14px auto 0; min-width: 220px; padding: 14px 28px; font: 700 20px/1 inherit; font-family: inherit; letter-spacing: .15em; color: #fff; background: #d8262f; border: 0; border-radius: 4px; cursor: pointer; }
+button.big:hover { background: #f03440; } button.big.alt { background: rgba(255,255,255,.14); }
+/* touch controls */
+body.touch, body.touch canvas { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+#touch { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+#stick { position: absolute; width: 110px; height: 110px; margin: -55px 0 0 -55px; border-radius: 50%; border: 2px solid rgba(255,255,255,.35); background: rgba(0,0,0,.2); opacity: 0; }
+#stick.on { opacity: 1; }
+#knob { position: absolute; left: 50%; top: 50%; width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,.55); transform: translate(-50%,-50%); }
+.tbtn { position: absolute; pointer-events: auto; width: 62px; height: 62px; border-radius: 50%; border: 2px solid rgba(255,255,255,.45); background: rgba(10,12,20,.45); color: #fff; font: 700 14px/1 inherit; font-family: inherit; touch-action: none; -webkit-tap-highlight-color: transparent; }
+.tbtn.on { background: rgba(216,38,47,.75); }
+#t-attack { right: 20px; bottom: calc(24px + env(safe-area-inset-bottom)); width: 78px; height: 78px; font-size: 17px; background: rgba(216,38,47,.45); }
+#t-jump { right: 108px; bottom: calc(18px + env(safe-area-inset-bottom)); }
+#t-swing { right: 26px; bottom: calc(114px + env(safe-area-inset-bottom)); }
+#t-up { right: 100px; bottom: calc(92px + env(safe-area-inset-bottom)); }
+#t-pull { right: 176px; bottom: calc(40px + env(safe-area-inset-bottom)); }
+#t-zip { right: 170px; bottom: calc(112px + env(safe-area-inset-bottom)); }
+#t-suit { left: 16px; top: 88px; width: 52px; height: 52px; font-size: 12px; }
+body.touch #help { display: none; }
+@media (max-width: 700px) {
+  #hp { left: 16px; top: 16px; width: 150px; }
+  #suit-tag { left: 16px; top: 34px; font-size: 11px; }
+  #score { left: 16px; top: 54px; font-size: 12px; } #score b { font-size: 15px; }
+  #minimap { right: 12px; top: 12px; width: 110px; height: 110px; }
+  #crime { right: 12px; top: 130px; width: 170px; font-size: 12px; }
+  #alert { font-size: 18px; width: 90%; }
+  #combo { font-size: 30px; right: 16px; }
+  #suit-cards { flex-direction: column; gap: 12px; }
+  .suit-card { width: 260px; padding: 10px; } .suit-card .swatch { height: 120px; }
+}

@@ -9,6 +9,7 @@ export class Input {
     this.mouseDX = 0;
     this.mouseDY = 0;
     this.locked = false;
+    this.stick = null; // touch joystick {x, y}
     this.dom = dom;
     const map = (e) => (e.code === 'Space' ? 'Space' : e.code);
     addEventListener('keydown', (e) => {
@@ -65,6 +66,7 @@ export class Input {
     this.released.add(code);
   }
   moveAxes() {
+    if (this.stick) { const l = Math.hypot(this.stick.x, this.stick.y); return { x: this.stick.x / l, y: this.stick.y / l }; }
     let x = 0, y = 0;
     if (this.down('KeyW', 'ArrowUp')) y += 1;
     if (this.down('KeyS', 'ArrowDown')) y -= 1;
